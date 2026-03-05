@@ -1,0 +1,86 @@
+created: 20260305110552553
+modified: 20260305110552553
+rdt.hub-category: infrastructure
+rdt.hub-category-name: Infrastructure
+rdt.hub-order: 3
+rdt.order: 1
+rdt.plugin-key: ext-connect
+rdt.plugin-name: ext connect
+rdt.plugin-subtitle: CLI-first inbound path for external tools — context resolution, templates, and outbound text-commands
+rdt.section: Overview
+title: $:/plugins/rimir/ext-connect/doc/overview
+type: text/vnd.tiddlywiki
+
+<$transclude $tiddler="$:/plugins/rimir/doc-template/templates/page">
+<$fill $name="body">
+
+!! What it does
+
+External Connect lets external tools (Claude Code, scripts, LLMs) push tiddlers into the wiki via CLI import — no running server needed. A shared resolution pipeline with context-aware rules and profile-based templates transforms raw JSON into fully-formed tiddlers with optional post-creation actions.
+
+* ''Inbound'' — CLI import (`--import`) is the primary path. External tools write a JSON file and run the CLI command; the deserializer resolves context, evaluates templates, writes `.tid` files to disk, and exits. A fallback POST endpoint exists for live-server scenarios but may be deprecated.
+* ''Outbound'' — `@Target` commands in tiddler text are extracted into separate command tiddlers routed to a watched folder on disk. External tools monitor that folder and process commands without watching the entire wiki.
+
+!! Features
+
+!!! Inbound (push)
+
+* ''CLI import'' — primary path: `TIDDLYWIKI_CLI_MODE=1 npx tiddlywiki mywiki --import input.json application/x-rimir-ext-connect`
+* ''Context resolution'' — caller specifies context tiddlers; their fields are available as variables in template filter expressions and rule matching
+* ''Profiles'' — named mappings to template tiddlers (e.g. "meeting-note" → template with title prefix + tags)
+* ''Rule-based dispatch'' — ordered rules use TW filter expressions to match context; first match selects template tiddler(s)
+* ''Template tiddlers'' — fields are TW filter expressions; `out.` prefix for reserved field names; `text` field runs as post-creation actions
+* ''Post-creation actions'' — template `text` field contains action widgets executed server-side after tiddler creation
+* ''Auto-persist'' — CLI path writes `.tid` files directly; server path uses syncer
+* ''Fallback: POST API'' — `POST /api/ext-connect/put-tiddler` for live-server integration (may be deprecated)
+
+!!! Outbound (text-commands)
+
+* ''`@Target` extraction'' — write `@LLM summarize this` in a tiddler, save, and the command is extracted into a separate tiddler
+* ''Multi-line commands'' — `@Target` ... `Target@` block syntax for longer commands
+* ''Configurable targets'' — JSON array of registered target names (e.g. `["LLM", "Dodo"]`)
+* ''Scan filter'' — only tiddlers matching a configurable filter are scanned (e.g. `[tag[process]]`)
+* ''FileSystemPaths routing'' — extracted command tiddlers are tagged and routed to `tiddlers/ext-outbox/` on disk
+* ''Inline transclusion'' — original text is replaced with a live-updating view of command status
+
+!! Prerequisites
+
+* TiddlyWiki installed via npm (Node.js)
+* Set `TIDDLYWIKI_CLI_MODE=1` for CLI import (prevents filesystem-watcher from keeping the process alive)
+
+!! Quick start
+
+# Create an input JSON file:
+
+```json
+{"text": "Hello from external"}
+```
+
+# Run the CLI import:
+
+```
+TIDDLYWIKI_CLI_MODE=1 npx tiddlywiki mywiki --import input.json application/x-rimir-ext-connect
+```
+
+# The tiddler appears at `Inbox/<timestamp>` with the `Inbox` tag (from the `default` profile template)
+
+# Use a profile for different defaults:
+
+```json
+{"text": "Meeting notes", "profile": "meeting-note"}
+```
+
+# Use context for rule-based dispatch (with post-creation actions):
+
+```json
+{"text": "Reply content", "context": ["MyStreamTiddler"]}
+```
+
+<$transclude $tiddler="$:/plugins/rimir/doc-template/templates/callout" type="info">
+<$fill $name="body">
+Profiles, rules, and template tiddlers are stored in the wiki — edit them from the browser without a server restart. The JS route and resolve modules require a restart if changed.
+</$fill>
+</$transclude>
+
+</$fill>
+</$transclude>

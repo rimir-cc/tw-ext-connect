@@ -1,0 +1,28 @@
+created: 20260305110552556
+modified: 20260305110552556
+tags: $:/tags/Stylesheet
+title: $:/plugins/rimir/ext-connect/text-command-styles
+type: text/vnd.tiddlywiki
+
+.tc-ext-command {
+	border-left: 3px solid <<colour primary>>;
+	padding: 4px 8px;
+	margin: 4px 0;
+	background: <<colour notification-background>>;
+	border-radius: 3px;
+}
+
+.tc-ext-command-target {
+	font-weight: bold;
+	color: <<colour primary>>;
+}
+
+.tc-ext-command-text {
+	font-style: italic;
+}
+
+.tc-ext-command-status {
+	font-size: 0.85em;
+	color: <<colour muted-foreground>>;
+	margin-top: 2px;
+}

@@ -1,0 +1,235 @@
+created: 20260305110552555
+modified: 20260305110552555
+title: $:/plugins/rimir/ext-connect/settings
+type: text/vnd.tiddlywiki
+
+<div class="rr-tabs">
+<$button set="$:/state/rimir/ext-connect/settings-tab" setTo="cli" class={{{ [{$:/state/rimir/ext-connect/settings-tab}match[cli]then[rr-tab rr-tab-active]else[rr-tab]] ~[[rr-tab rr-tab-active]] }}}> CLI </$button>
+<$button set="$:/state/rimir/ext-connect/settings-tab" setTo="inbound" class={{{ [{$:/state/rimir/ext-connect/settings-tab}match[inbound]then[rr-tab rr-tab-active]else[rr-tab]] }}}> Inbound </$button>
+<$button set="$:/state/rimir/ext-connect/settings-tab" setTo="outbound" class={{{ [{$:/state/rimir/ext-connect/settings-tab}match[outbound]then[rr-tab rr-tab-active]else[rr-tab]] }}}> Outbound </$button>
+<$button set="$:/state/rimir/ext-connect/settings-tab" setTo="reference" class={{{ [{$:/state/rimir/ext-connect/settings-tab}match[reference]then[rr-tab rr-tab-active]else[rr-tab]] }}}> Reference </$button>
+</div>
+
+<!-- ===== INBOUND TAB ===== -->
+
+<$reveal stateTitle="$:/state/rimir/ext-connect/settings-tab" type="match" text="inbound">
+
+<div class="rr-muted rr-small">
+
+The POST API (`/api/ext-connect/put-tiddler`) is a fallback for live-server scenarios. The primary inbound path is CLI import — see the CLI tab. The POST endpoint may be deprecated in a future version.
+
+</div>
+
+!! Profiles
+
+Profiles map names to template tiddlers. The `default` profile is used when no profile is specified.
+
+<table class="rr-table">
+<tr><th>Profile</th><th>Template tiddler</th></tr>
+<$list filter="[[$:/config/rimir/ext-connect/profiles]jsonindexes[]]">
+<tr>
+<td><<currentTiddler>></td>
+<td><$link to={{{ [[$:/config/rimir/ext-connect/profiles]jsonget<currentTiddler>] }}}><$text text={{{ [[$:/config/rimir/ext-connect/profiles]jsonget<currentTiddler>] }}}/></$link></td>
+</tr>
+</$list>
+</table>
+
+<div class="rr-muted rr-small">
+
+Edit directly: [[$:/config/rimir/ext-connect/profiles]]
+
+</div>
+
+---
+
+!! Rules
+
+Rules are evaluated in order (first match wins). Each rule has a TW `filter` tested against the wiki and one or more `templates`.
+
+<table class="rr-table">
+<tr><th>#</th><th>Name</th><th>Filter</th><th>Templates</th></tr>
+<$list filter="[[$:/config/rimir/ext-connect/rules]jsonindexes[]]" counter="idx">
+<$let rule-name={{{ [[$:/config/rimir/ext-connect/rules]jsonget<currentTiddler>,[name]] }}}
+     rule-filter={{{ [[$:/config/rimir/ext-connect/rules]jsonget<currentTiddler>,[filter]] }}}>
+<tr>
+<td><<idx>></td>
+<td><<rule-name>></td>
+<td><code><<rule-filter>></code></td>
+<td><$list filter="[[$:/config/rimir/ext-connect/rules]jsonindexes<currentTiddler>,[templates]]" variable="tplIdx"><$let tpl-title={{{ [[$:/config/rimir/ext-connect/rules]jsonget<currentTiddler>,[templates],<tplIdx>] }}}><$link to=<<tpl-title>>><$text text=<<tpl-title>>/></$link><br/></$let></$list></td>
+</tr>
+</$let>
+</$list>
+</table>
+
+<div class="rr-muted rr-small">
+
+Edit directly: [[$:/config/rimir/ext-connect/rules]]
+
+</div>
+
+---
+
+!! Template tiddlers
+
+<$list filter="[all[shadows+tiddlers]prefix[$:/config/rimir/ext-connect/tpl/]]">
+<div class="rr-panel">
+<div class="rr-panel-body">
+''<$link/>''
+<$list filter="[all[current]fields[]prefix[out.]sort[]]" variable="fname">
+<br/>&ensp;<code><<fname>></code>: <code><$transclude field=<<fname>>/></code>
+</$list>
+<$list filter="[all[current]fields[]!prefix[out.]!match[title]!match[text]!match[type]!match[tags]!match[created]!match[modified]!match[creator]!match[modifier]!match[bag]!match[revision]sort[]]" variable="fname">
+<br/>&ensp;<code><<fname>></code>: <code><$transclude field=<<fname>>/></code>
+</$list>
+<$list filter="[all[current]get[text]!match[]] +[limit[1]]" variable="_">
+<br/>&ensp;<span class="rr-muted">Has post-creation actions</span>
+</$list>
+</div>
+</div>
+</$list>
+
+</$reveal>
+
+<!-- ===== OUTBOUND TAB ===== -->
+
+<$reveal stateTitle="$:/state/rimir/ext-connect/settings-tab" type="match" text="outbound">
+
+!! Registered targets
+
+<$list filter="[[$:/config/rimir/text-command/targets]jsonindexes[]]">
+<span class="rr-badge-rect"><$text text={{{ [[$:/config/rimir/text-command/targets]jsonget<currentTiddler>] }}}/></span>&ensp;
+</$list>
+
+<div class="rr-muted rr-small">
+
+Edit directly: [[$:/config/rimir/text-command/targets]]
+
+</div>
+
+---
+
+!! Scan filter
+
+Only tiddlers matching this filter are scanned for `@Target` commands on save:
+
+<code class="rr-mono"><$transclude tiddler="$:/config/rimir/text-command/scan-filter" field="text"/></code>
+
+<div class="rr-muted rr-small">
+
+Edit directly: [[$:/config/rimir/text-command/scan-filter]]
+
+</div>
+
+---
+
+!! Outbox tag
+
+Tag applied to extracted command tiddlers (must match `$:/config/FileSystemPaths` routing):
+
+<code class="rr-mono"><$transclude tiddler="$:/config/rimir/text-command/outbox-tag" field="text"/></code>
+
+<div class="rr-muted rr-small">
+
+Edit directly: [[$:/config/rimir/text-command/outbox-tag]]
+
+</div>
+
+---
+
+!! Cascade selectors
+
+The delegate template dispatches to context render templates via `:cascade`. Evaluated in order — first match wins.
+
+<table class="rr-table">
+<tr><th>Order</th><th>Selector</th><th>Filter</th></tr>
+<$list filter="[all[shadows+tiddlers]tag[$:/tags/rimir/text-command/context-template]sort[order]]">
+<tr>
+<td>{{!!order}}</td>
+<td><$link/></td>
+<td><code><$view field="text"/></code></td>
+</tr>
+</$list>
+</table>
+
+---
+
+!! Context render templates
+
+<$list filter="[all[shadows+tiddlers]prefix[$:/config/rimir/text-command/ctx/]]">
+
+* <$link/>
+
+</$list>
+
+</$reveal>
+
+<!-- ===== CLI TAB ===== -->
+
+<$reveal stateTitle="$:/state/rimir/ext-connect/settings-tab" type="match" text="cli" default="cli">
+
+!! CLI import (`--import`) — primary inbound path
+
+Import tiddlers via CLI — no running server needed. This is the recommended way to push tiddlers from external tools.
+
+```
+TIDDLYWIKI_CLI_MODE=1 npx tiddlywiki mywiki --import input.json application/x-rimir-ext-connect
+```
+
+Set `TIDDLYWIKI_CLI_MODE=1` so the filesystem-watcher skips startup and the process exits cleanly.
+
+!!! JSON format
+
+|!Field |!Required |!Type |!Description |
+|`text` |Yes |string |Tiddler content |
+|`title` |No |string |Explicit title (overrides generated title) |
+|`profile` |No |string |Named profile from profiles config |
+|`context` |No |string[] |Tiddler titles for rule matching |
+|`fields` |No |object |Explicit field overrides (merged after rules) |
+
+!!! Notes
+
+* `.tid` files are written directly to `mywiki/tiddlers/` (respects `$:/config/FileSystemPaths`)
+* If a server is running, filesystem-watcher detects the new file and syncs to browser
+* Post-creation actions execute identically to the POST path
+
+</$reveal>
+
+<!-- ===== REFERENCE TAB ===== -->
+
+<$reveal stateTitle="$:/state/rimir/ext-connect/settings-tab" type="match" text="reference">
+
+!! Variables available in filters and actions
+
+|!Variable |!Available in |!Value |
+|`context-titles` |filters + actions |Space-separated list of context tiddler titles |
+|`context.0.title` |filters + actions |Title of first context tiddler |
+|`context.N.fields.X` |filters + actions |Field X of Nth context tiddler |
+|`timestamp` |filters + actions |UTC `YYYYMMDDHHMMSSMMM` |
+|`profile` |filters + actions |Profile name from request |
+|`new-title` |actions only |Title of the just-created tiddler |
+
+---
+
+!! Template field convention
+
+|!Field pattern |!Behavior |
+|`out.fieldname` |Strip `out.` prefix → output field; value evaluated as TW filter. Use for reserved names (`title`, `tags`, `type`, etc.) |
+|non-reserved field |Output field directly; value evaluated as TW filter |
+|reserved field (`title`, `text`, `type`, `tags`, `created`, `modified`, ...) |Skipped as output (belongs to the template itself) |
+|`text` (template body) |Executed as action widgets after tiddler creation |
+
+For `tags` output: all filter results joined as TW string list. For all other fields: first filter result used.
+
+---
+
+!! Resolution pipeline (merge order)
+
+# Profile template fields → base output
+# Rule templates (first-match) → merge into output; collect action text
+# `body.fields` from request → explicit overrides
+# `body.title` / `body.text` from request → always win
+# Fallback title: `Inbox/<timestamp>` if still missing
+# Default `type: text/vnd.tiddlywiki` if missing
+# Save tiddler → execute collected actions
+
+</$reveal>

@@ -1,0 +1,326 @@
+created: 20260305110552553
+modified: 20260305110552553
+rdt.order: 4
+rdt.plugin-key: ext-connect
+rdt.plugin-name: ext connect
+rdt.plugin-subtitle: CLI-first inbound path for external tools — context resolution, templates, and outbound text-commands
+rdt.section: Reference
+title: $:/plugins/rimir/ext-connect/doc/reference
+type: text/vnd.tiddlywiki
+
+<$transclude $tiddler="$:/plugins/rimir/doc-template/templates/page">
+<$fill $name="body">
+
+!! CLI import (`--import`) — primary inbound path
+
+Import tiddlers via the CLI using the same JSON format and resolution pipeline:
+
+```
+TIDDLYWIKI_CLI_MODE=1 npx tiddlywiki mywiki --import input.json application/x-rimir-ext-connect
+```
+
+Set `TIDDLYWIKI_CLI_MODE=1` so the filesystem-watcher skips startup and the process exits cleanly. Tiddler files are written directly to `mywiki/tiddlers/` (respecting `$:/config/FileSystemPaths`).
+
+|!Argument |!Value |
+|`wiki-folder` |`mywiki` |
+|`filepath` |Path to a JSON file with the request payload |
+|`deserializer` |`application/x-rimir-ext-connect` (custom MIME type) |
+
+Input JSON format (identical to POST body):
+
+|!Field |!Required |!Type |!Description |
+|`text` |Yes |string |Tiddler content |
+|`title` |No |string |Explicit title (overrides generated title) |
+|`profile` |No |string |Named profile from profiles config |
+|`context` |No |string[] |Tiddler titles for rule matching (read from wiki store at import time) |
+|`fields` |No |object |Explicit field overrides (merged after rules) |
+
+Console output on success:
+
+```
+ext-connect: created "Inbox/20260304120000000" → /path/to/file.tid
+```
+
+Notes:
+
+* No running server required — `--import` boots TW from disk, runs deserializer, exits
+* `TIDDLYWIKI_CLI_MODE=1` prevents filesystem-watcher from keeping the process alive
+* `.tid` file written directly to `mywiki/tiddlers/` (respects `$:/config/FileSystemPaths`)
+* If a server is running, filesystem-watcher detects the new file and syncs to browser
+* Post-creation actions execute identically to the POST path
+* Returns 0 tiddlers to `--import` (self-save pattern) — see architecture docs
+
+---
+
+!! POST /api/ext-connect/put-tiddler (fallback — may be deprecated)
+
+Request body (JSON):
+
+|!Field |!Required |!Type |!Description |
+|`text` |Yes |string |Tiddler content |
+|`title` |No |string |Explicit title (overrides generated title) |
+|`profile` |No |string |Named profile from profiles config |
+|`context` |No |string[] |Tiddler titles for rule matching |
+|`fields` |No |object |Explicit field overrides (merged after rules) |
+
+Required headers:
+
+|!Header |!Value |
+|`Content-Type` |`application/json` |
+|`X-Requested-With` |`TiddlyWiki` |
+
+Success response (200):
+
+```json
+{
+    "status": "ok",
+    "title": "Inbox/20260304120000000"
+}
+```
+
+Error responses:
+
+|!HTTP |!Condition |
+|400 |Invalid JSON body |
+|400 |Missing required `text` field |
+|403 |Missing `X-Requested-With` header |
+|500 |Internal processing error |
+
+!! Profiles config
+
+Tiddler: `$:/config/rimir/ext-connect/profiles` (type: `application/json`)
+
+Maps profile names to template tiddler titles:
+
+```json
+{
+    "default": "$:/config/rimir/ext-connect/tpl/default",
+    "meeting-note": "$:/config/rimir/ext-connect/tpl/meeting-note"
+}
+```
+
+The `default` profile is used when no profile is specified in the request.
+
+!! Rules config
+
+Tiddler: `$:/config/rimir/ext-connect/rules` (type: `application/json`)
+
+```json
+[
+    {
+        "name": "rule-name",
+        "filter": "[enlist<context-titles>has[some-field]limit[1]]",
+        "templates": ["$:/config/rimir/ext-connect/tpl/some-template"]
+    }
+]
+```
+
+Rules are evaluated in array order. First matching rule wins.
+
+|!Field |!Description |
+|`name` |Human-readable rule name |
+|`filter` |TW filter expression — non-empty result means match |
+|`templates` |Array of template tiddler titles, evaluated in order (later overrides earlier for fields; actions concatenated) |
+
+!! Template tiddler reference
+
+Template tiddlers define output fields via TW filter expressions.
+
+!!! Field naming
+
+|!Field pattern |!Behavior |
+|`out.fieldname` |Strip `out.` prefix → output field name; value evaluated as TW filter |
+|non-reserved field |Output field directly; value evaluated as TW filter |
+|reserved field |Skipped as output (template metadata) |
+
+Reserved fields (skipped): `title`, `text`, `type`, `tags`, `created`, `modified`, `creator`, `modifier`, `bag`, `revision`
+
+!!! Field evaluation
+
+* ''`tags` output'' (after prefix stripping): all filter results joined via `$tw.utils.stringifyList()`
+* ''All other fields'': first filter result used as value
+* ''Conflict resolution'': if both `out.parent` and `parent` exist, the `out.` version wins
+
+!!! Example template tiddler
+
+```
+title: $:/config/rimir/ext-connect/tpl/stream-reply
+out.title: [<context.0.title>addsuffix[/]addsuffix<timestamp>]
+out.tags: [[StreamReply]]
+parent: [<context.0.title>]
+
+<$action-listops $tiddler=<<context.0.title>> $field="list" $subfilter="[<new-title>]"/>
+```
+
+* `title` → skipped (reserved — template's own identity)
+* `text` → skipped as output, executed as post-creation actions
+* `out.title` → strip prefix → output `title` = filter result
+* `out.tags` → strip prefix → output `tags` = all filter results as TW string list
+* `parent` → not reserved → output `parent` = first filter result
+
+!! Post-creation actions
+
+The `text` field of template tiddlers contains action widget markup executed server-side after the new tiddler is saved.
+
+All variables available during filter evaluation are available, plus:
+
+|!Variable |!Value |
+|`new-title` |Title of the just-created tiddler |
+
+Supported action widgets include `<$action-setfield>`, `<$action-listops>`, `<$action-deletefield>`, and any other widget that operates via `$tw.wiki` methods.
+
+!! Variables available in filters and actions
+
+|!Variable |!Available in |!Value |
+|`context-titles` |filters + actions |Space-separated list of context tiddler titles (via `$tw.utils.stringifyList`) |
+|`context.0.title` |filters + actions |Title of first context tiddler |
+|`context.N.fields.X` |filters + actions |Field X of Nth context tiddler |
+|`timestamp` |filters + actions |UTC `YYYYMMDDHHMMSSMMM` |
+|`profile` |filters + actions |Profile name from request |
+|`new-title` |actions only |Title of the just-created tiddler |
+
+!! Resolution pipeline
+
+Shared by both POST and CLI `--import` paths:
+
+# Build variables map from context tiddlers + request
+# Profile template: evaluate fields → base output
+# Rule evaluation: first-match filter → evaluate template fields → merge into output; collect action text
+# `body.fields` from request → explicit overrides
+# `body.title` / `body.text` from request → always win
+# Fallback title: `Inbox/<timestamp>` if still missing
+# Default `type: text/vnd.tiddlywiki` if missing
+# Save tiddler to wiki store
+# ''POST path'': syncer mismatch triggers file write on next tick
+# ''CLI path'': `saveTiddlerToFileSync` writes `.tid` directly to `mywiki/tiddlers/`
+# Execute collected action text with `new-title` variable added
+# Persist any tiddlers modified by actions (syncer mismatch or direct disk write)
+
+---
+
+!! Text-command syntax (outbound)
+
+!!! Single-line command
+
+```
+@Target command text here
+```
+
+`@Target` followed by a space and non-whitespace characters on the same line. The entire line after `@Target ` is the command text.
+
+!!! Multi-line command
+
+```
+@Target
+Multi-line command text.
+Can span multiple lines.
+Target@
+```
+
+`@Target` on its own line (optionally followed by whitespace), content until a closing `Target@` line.
+
+!!! Registered targets
+
+Tiddler: `$:/config/rimir/text-command/targets` (type: `application/json`)
+
+```json
+["LLM", "Dodo"]
+```
+
+Only these strings are recognized as targets. Unregistered `@strings` are left as-is.
+
+!!! Scan filter
+
+Tiddler: `$:/config/rimir/text-command/scan-filter`
+
+```
+[tag[process]]
+```
+
+Only tiddlers matching this filter are scanned for `@Target` commands on save.
+
+!!! Outbox tag
+
+Tiddler: `$:/config/rimir/text-command/outbox-tag`
+
+Default: `ext-outbox`. Must match the `$:/config/FileSystemPaths` routing rule.
+
+!!! Command tiddler fields
+
+|!Field |!Value |
+|`title` |`<OriginalTitle>/@<Target>/<timestamp>` |
+|`tags` |Outbox tag |
+|`text` |Extracted command text |
+|`source` |Title of originating tiddler |
+|`target` |Target name (e.g. `LLM`) |
+|`command-text` |Extracted command text |
+|`status` |`pending` — external tools update this |
+
+!!! View template
+
+Tiddler: `$:/config/rimir/text-command/view-template`
+
+Rendered inline where the command was extracted. The `currentTiddler` is the command tiddler (set by the `<$tiddler>` wrapper). Fields like `status` update live when modified by external tools.
+
+---
+
+!! Context rendering (`--render`)
+
+External tools render context for command tiddlers using TW's `--render` command with the delegate template:
+
+```
+npx tiddlywiki mywiki --render "[[CmdTitle]]" "[[output.txt]]" "text/plain" "$:/config/rimir/text-command/delegate"
+```
+
+|!Argument |!Value |
+|`title` |Command tiddler title (wiki-syntax `[[...]]`) |
+|`output` |Output filename (written to `mywiki/output/`) |
+|`type` |`text/plain` — raw text, no HTML wrapping |
+|`template` |`$:/config/rimir/text-command/delegate` — cascade dispatcher (plain tiddler title, not filter syntax) |
+
+!! Delegate template
+
+Tiddler: `$:/config/rimir/text-command/delegate`
+
+Uses `:cascade` to select a context render template based on the command tiddler's fields. The `currentTiddler` is the command tiddler title (set by `--render`).
+
+!! Cascade selectors
+
+Tagged `$:/tags/rimir/text-command/context-template`, sorted by `order` field (ascending). Each tiddler's `text` is a filter expression:
+
+* Receives the command tiddler as input
+* Returns the title of a context render template if it matches
+* First non-empty result wins
+
+|!Selector |!Order |!Filter |
+|`llm` |100 |`[all[current]get[target]match[LLM]then[$:/config/rimir/text-command/ctx/llm]]` |
+|`dodo` |200 |`[all[current]get[target]match[Dodo]then[$:/config/rimir/text-command/ctx/dodo]]` |
+|`default` |9999 |`[all[current]then[$:/config/rimir/text-command/ctx/default]]` |
+
+!! Context render templates
+
+Wikitext tiddlers that produce plain-text output. `currentTiddler` is the command tiddler. Available fields via transclusion:
+
+|!Field |!Description |
+|`target` |Target name (e.g. `LLM`) |
+|`command-text` |The extracted command text |
+|`source` |Title of the originating tiddler |
+|`text` |Command text (same as `command-text`) |
+|`status` |Command status (e.g. `pending`) |
+
+Templates can transclude the source tiddler's content with `<$transclude tiddler={{!!source}} field="text"/>`.
+
+!! Adding a new target context
+
+# Create a cascade selector tiddler:
+#* Tag: `$:/tags/rimir/text-command/context-template`
+#* `order` field: number (lower = higher priority, before 9999 default)
+#* `text`: filter expression returning a context template title
+# Create a context render template tiddler:
+#* Wikitext producing the desired plain-text output
+#* `currentTiddler` is the command tiddler
+
+No JS changes or server restart needed.
+
+</$fill>
+</$transclude>

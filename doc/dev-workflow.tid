@@ -1,0 +1,102 @@
+created: 20260305110552552
+modified: 20260305110552552
+rdt.order: 3
+rdt.plugin-key: ext-connect
+rdt.plugin-name: ext connect
+rdt.plugin-subtitle: CLI-first inbound path for external tools — context resolution, templates, and outbound text-commands
+rdt.section: Dev Workflow
+title: $:/plugins/rimir/ext-connect/doc/dev-workflow
+type: text/vnd.tiddlywiki
+
+<$transclude $tiddler="$:/plugins/rimir/doc-template/templates/page">
+<$fill $name="body">
+
+!! Plugin files
+
+|!File |!Role |
+|`route.js` |Server-side: POST `/api/ext-connect/put-tiddler` handler |
+|`deserializer.js` |Server-side: `tiddlerdeserializer` for `application/x-rimir-ext-connect` — CLI `--import` path |
+|`resolve.js` |Server-side: resolution pipeline + action execution + context loading (library module) |
+|`profiles.tid` |Config: `$:/config/rimir/ext-connect/profiles` — profile name → template tiddler mapping |
+|`rules.tid` |Config: `$:/config/rimir/ext-connect/rules` — filter → template tiddler(s) rules |
+|`tpl-default.tid` |Template: `$:/config/rimir/ext-connect/tpl/default` |
+|`tpl-meeting-note.tid` |Template: `$:/config/rimir/ext-connect/tpl/meeting-note` |
+|`tpl-stream-reply.tid` |Template: `$:/config/rimir/ext-connect/tpl/stream-reply` |
+|`tpl-discussion-reply.tid` |Template: `$:/config/rimir/ext-connect/tpl/discussion-reply` |
+|`settings.tid` |Control Panel settings UI |
+|`readme.tid` |Plugin readme (transcludes overview doc) |
+|`doc-overview.tid` |Documentation: Overview tab |
+|`doc-architecture.tid` |Documentation: Architecture tab |
+|`doc-dev-workflow.tid` |Documentation: Dev Workflow tab |
+|`doc-reference.tid` |Documentation: Reference tab |
+|`text-command.js` |Browser-side: `th-saving-tiddler` hook for text-command extraction |
+|`text-command-targets.tid` |Config: `$:/config/rimir/text-command/targets` — registered target names |
+|`text-command-scan-filter.tid` |Config: `$:/config/rimir/text-command/scan-filter` — tiddler scan filter |
+|`text-command-outbox-tag.tid` |Config: `$:/config/rimir/text-command/outbox-tag` — tag for command tiddlers |
+|`text-command-view-template.tid` |Config: `$:/config/rimir/text-command/view-template` — inline display template |
+|`text-command-styles.tid` |Stylesheet: CSS for inline command display |
+|`filesystem-paths-setup.js` |Server-side: prepends `ext-outbox` routing rule to `$:/config/FileSystemPaths` at boot |
+|`text-command-delegate.tid` |Config: `$:/config/rimir/text-command/delegate` — cascade dispatcher for `--render` |
+|`text-command-ctx-selector-llm.tid` |Cascade selector: LLM target (order 100) |
+|`text-command-ctx-selector-dodo.tid` |Cascade selector: Dodo target (order 200) |
+|`text-command-ctx-selector-default.tid` |Cascade selector: fallback (order 9999) |
+|`text-command-ctx-llm.tid` |Context render template: LLM target |
+|`text-command-ctx-dodo.tid` |Context render template: Dodo target |
+|`text-command-ctx-default.tid` |Context render template: default fallback |
+
+!! Restart rules
+
+|!Change |!Restart needed? |
+|`route.js` / `resolve.js` / `deserializer.js` |Yes — JS modules loaded at boot |
+|`profiles.tid` content |No — re-read from wiki store per request |
+|`rules.tid` content |No — re-read from wiki store per request |
+|Template tiddlers (`tpl-*.tid`) |No — re-read from wiki store per request |
+|Settings UI / doc tiddlers |No — shadow tiddlers, but may need browser reload |
+|`text-command.js` |Yes — browser startup module loaded at boot |
+|`filesystem-paths-setup.js` |Yes — server startup module loaded at boot |
+|Text-command config tiddlers |No — re-read from wiki store per save |
+|Context templates + cascade selectors |No — wikitext shadow tiddlers, evaluated at render time |
+
+!! External files
+
+The `mywiki-cli` wrapper (sibling to `mywiki/`) is part of this plugin's workflow but lives outside the plugin directory:
+
+|!File |!Role |
+|`mywiki-cli/tiddlywiki.info` |CLI wrapper — includes `mywiki` read-only via `includeWikis` |
+|`mywiki-cli/tiddlers/$__config_Plugins_Disabled_$__plugins_rimir_filesystem-watcher.tid` |Disables filesystem-watcher so CLI process exits after import |
+
+!! Debugging
+
+!!! POST endpoint (fallback — may be deprecated)
+
+* Basic test: `curl -s -X POST http://localhost:8080/api/ext-connect/put-tiddler -H "Content-Type: application/json" -H "X-Requested-With: TiddlyWiki" -d '{"text": "test"}'`
+* Check response: should return `{"status": "ok", "title": "Inbox/..."}`
+* Verify on disk: look for new `.tid` files in `mywiki/tiddlers/`
+* Check browser: tiddler appears after syncer poll (default 4s)
+* Test actions: create a context tiddler with a `streams-default` field and `list` field, then send a request with `"context": ["ThatTiddler"]` — verify the parent's `list` field is updated
+
+!!! CLI import (deserializer)
+
+* Basic test: `echo '{"text": "test"}' > /tmp/test.json && TIDDLYWIKI_CLI_MODE=1 npx tiddlywiki mywiki --import /tmp/test.json application/x-rimir-ext-connect`
+* Check console: should print `ext-connect: created "Inbox/..." → /path/to/file.tid`
+* Verify file lands in `mywiki/tiddlers/`
+* Process should exit cleanly (`TIDDLYWIKI_CLI_MODE=1` prevents filesystem-watcher from hanging)
+* With server running: verify filesystem-watcher picks up the file and it appears in browser
+
+!! Key gotchas
+
+* ''CSRF header required'': all requests need `X-Requested-With: TiddlyWiki` header
+* ''`state.data` not `request.on("data")`'': TW's server framework pre-reads POST bodies into `state.data`; manually reading the request stream will hang
+* ''Tags are arrays'': TW stores tags as arrays internally, not strings — use `Array.isArray()` check when reading from `tiddler.fields.tags`
+* ''Syncer timing'': after `addTiddler()`, the file appears on disk after the next syncer tick (typically a few seconds)
+* ''Template field values are filters'': if you want a literal string as output, wrap it in double brackets: `[[my literal value]]`
+* ''Action widgets need `$tw.fakeDocument`'': server-side action execution requires a real `Widget` instance (not the duck-typed fake used for filter evaluation)
+* ''CLI wrapper write target'': `$tw.boot.wikiTiddlersPath` points to `mywiki-cli/tiddlers/` when using the wrapper — the deserializer resolves the first `includeWikis` entry to write to `mywiki/tiddlers/` instead
+* ''`$:/StoryList` in wrapper'': the syncer writes `$:/StoryList` to `mywiki-cli/tiddlers/` during CLI runs — this is harmless junk, can be gitignored
+
+<$transclude $tiddler="$:/plugins/rimir/doc-template/templates/callout" type="tip">
+<$fill $name="body">On Windows, use `taskkill //F //PID <pid> //T` to kill the server for restart.</$fill>
+</$transclude>
+
+</$fill>
+</$transclude>

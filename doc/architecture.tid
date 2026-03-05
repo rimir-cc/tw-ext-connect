@@ -1,0 +1,237 @@
+created: 20260305110552551
+modified: 20260305110552551
+rdt.order: 2
+rdt.plugin-key: ext-connect
+rdt.plugin-name: ext connect
+rdt.plugin-subtitle: CLI-first inbound path for external tools — context resolution, templates, and outbound text-commands
+rdt.section: Architecture
+title: $:/plugins/rimir/ext-connect/doc/architecture
+type: text/vnd.tiddlywiki
+
+<$transclude $tiddler="$:/plugins/rimir/doc-template/templates/page">
+<$fill $name="body">
+
+!! Core principle
+
+External tools push content via CLI import (primary) or HTTP POST (fallback). Both paths share a single resolution pipeline that transforms the raw request into a fully-formed tiddler by evaluating template tiddlers whose fields are TW filter expressions. Post-creation side effects are handled by action widgets in the template's `text` field.
+
+!! Data flow (CLI import — primary path)
+
+# External tool writes JSON to a file and runs `TIDDLYWIKI_CLI_MODE=1 npx tiddlywiki mywiki --import input.json application/x-rimir-ext-connect`
+# `deserializer.js` parses JSON from the file
+# Context tiddler titles from the request are loaded from `$tw.wiki`
+# `resolve.js` builds variable map (context, timestamp, profile)
+# Profile lookup → template tiddler evaluated → base output fields
+# Rule evaluation: first-match TW filter → template tiddler(s) evaluated → fields merged
+# Explicit `body.fields` override → merge on top
+# `body.title` / `body.text` → always win
+# Title fallback: `Inbox/<timestamp>` if still missing; default `type` if missing
+# Tiddler saved to `$tw.wiki` + written to disk via `saveTiddlerToFileSync`
+# ''Post-creation actions'': collected `text` from templates executed as action widgets (with `new-title` variable)
+# Any tiddlers modified by actions detected via changeCount diff and persisted to disk
+# If a server is running, filesystem-watcher detects the new `.tid` files and syncs to browser
+
+!! Data flow (POST — fallback, may be deprecated)
+
+# External tool sends `POST /api/ext-connect/put-tiddler` with JSON body
+# `route.js` validates CSRF header and parses body from `state.data`
+# Steps 3–9 are identical (shared `resolve.js` pipeline)
+# Tiddler saved to `$tw.wiki` + syncer mismatch triggers file write on next tick
+# Post-creation actions executed; syncer updated for any tiddlers modified by actions
+# JSON response returned: `{status, title}`
+
+!! Template tiddler field convention
+
+Template tiddlers define output fields. Each non-reserved field's value is a TW filter expression.
+
+|!Field pattern |!Behavior |
+|`out.fieldname` |Strip `out.` prefix → output field name; value evaluated as TW filter |
+|non-reserved field |Output field directly; value evaluated as TW filter |
+|reserved (`title`, `text`, `type`, `tags`, `created`, `modified`, `creator`, `modifier`, `bag`, `revision`) |Skipped as output |
+|`text` (body) |Collected as action widget markup, executed after tiddler creation |
+
+Special handling:
+
+* ''tags output'': all filter results joined via `$tw.utils.stringifyList()` (supports multi-value)
+* ''All other fields'': first filter result used as value
+* ''Conflict'': if both `out.parent` and `parent` exist, the `out.` version wins
+
+!! Merge order
+
+Fields accumulate through the pipeline. Later stages override earlier ones:
+
+|!Priority |!Source |!Example |
+|1 (lowest) |Profile template |`title`, `tags`, `type` from template filter evaluation |
+|2 |Rule template(s) |Fields + actions from matched rule's template tiddler(s) |
+|3 |Explicit `fields` from body |`{"tags": "Override", "custom": "value"}` |
+|4 (highest) |`title` / `text` from body |Always wins if present |
+|fallback |Auto-generated title |`Inbox/<timestamp>` |
+
+!! Components
+
+|!Component |!Layer |!Role |
+|`route.js` |Server (Node.js) |HTTP POST handler — CSRF check, body parse, context loading, save + action execution |
+|`deserializer.js` |Server (Node.js) |CLI `--import` handler — JSON parse, resolve, disk persistence, action execution |
+|`resolve.js` |Server (library) |Shared resolution pipeline — variable building, context loading, filter evaluation, template processing, action execution |
+|`profiles.tid` |Wiki store (JSON) |Named profile → template tiddler title mapping |
+|`rules.tid` |Wiki store (JSON) |Ordered rules: TW filter → template tiddler title(s) |
+|`tpl-*.tid` |Wiki store |Template tiddlers with filter-valued fields and action widget text |
+
+!! Rule evaluation
+
+Rules are stored as an ordered JSON array. Evaluation is //first-match wins//:
+
+# Iterate rules in order
+# For each rule, evaluate its `filter` against the wiki (with `context-titles` variable)
+# Non-empty result = match → evaluate the rule's `templates` in order, merging fields
+# If no rule matches → no rule-derived fields (profile + explicit fields still apply)
+
+!! Post-creation actions
+
+The `text` field of template tiddlers contains TW action widget markup. After the main tiddler is saved:
+
+# All collected action text (from profile + matched rule templates) is concatenated
+# A real `Widget` instance is created with `$tw.fakeDocument` (TW's server-side fake DOM)
+# Variables set: all filter variables + `new-title` (the just-created tiddler's title)
+# `invokeActionString()` executes the action widgets (e.g. `<$action-listops>`, `<$action-setfield>`)
+# Any tiddlers modified by actions are detected and synced to disk
+
+!! CLI deserializer internals
+
+A `tiddlerdeserializer` module registers the MIME type `application/x-rimir-ext-connect`, enabling CLI import:
+
+```
+TIDDLYWIKI_CLI_MODE=1 npx tiddlywiki mywiki --import input.json application/x-rimir-ext-connect
+```
+
+Set `TIDDLYWIKI_CLI_MODE=1` so the filesystem-watcher skips startup and the process exits cleanly after import.
+
+The deserializer reuses the same `resolve.js` pipeline as the POST route — profiles, rules, templates, and post-creation actions all work identically. The key difference is persistence: since no syncer runs in CLI mode, the deserializer writes `.tid` files to disk directly using `$tw.utils.generateTiddlerFileInfo()` + `$tw.utils.saveTiddlerToFileSync()`, respecting `$:/config/FileSystemPaths` rules.
+
+!!! Write target resolution
+
+With `includeWikis`, `$tw.boot.wikiTiddlersPath` points to the wrapper's own `tiddlers/` directory — not the included wiki's. The deserializer resolves the first `includeWikis` entry's path and writes to its `tiddlers/` subdirectory instead. This ensures files land in `mywiki/tiddlers/` where the running server's filesystem-watcher can detect them. The wrapper's `tiddlers/` dir holds only the plugin-disable tiddler and transient syncer artifacts (`$:/StoryList`).
+
+!!! Self-save pattern
+
+TW's `--import` flow normally expects the deserializer to return tiddler objects, which `wiki.importTiddler()` saves. But `importTiddler` has no action-execution hook, and we need to run post-creation actions that reference `new-title`. The deserializer handles everything internally (resolve, save, persist, execute actions) and returns `[]`. The `--import` command logs "0 tiddler(s) imported" but the deserializer logs its own success message.
+
+!!! Action-modified tiddler persistence
+
+After executing post-creation actions, the deserializer compares `changeCount` before/after to detect which tiddlers were modified by actions, and persists those to disk as well.
+
+!! Filesystem persistence (POST fallback path)
+
+Uses the syncer mismatch pattern: after `addTiddler()`, sets `$tw.syncer.tiddlerInfo[title].changeCount` to `wiki.getChangeCount() - 1`. The syncer detects the mismatch on its next tick and writes the `.tid` file to disk.
+
+<$transclude $tiddler="$:/plugins/rimir/doc-template/templates/callout" type="info">
+<$fill $name="body">
+This is the inverse of the filesystem-watcher pattern, which sets `changeCount` to //match// the wiki to //prevent// syncer writes. Here we intentionally create a mismatch to //trigger// the write.
+</$fill>
+</$transclude>
+
+---
+
+!! Text-command extraction (outbound)
+
+The outbound path extracts `@Target` commands from tiddler text and routes them to a watched folder on disk.
+
+!!! Extraction flow
+
+# User saves a tiddler in the browser (navigator widget triggers `th-saving-tiddler`)
+# Hook checks if tiddler matches the configurable scan filter (`$:/config/rimir/text-command/scan-filter`)
+# Text is parsed for `@Target` patterns using regexes built from the registered targets list
+# For each command found: a command tiddler is created via `$tw.wiki.addTiddler()` with the outbox tag
+# The command text in the original tiddler is replaced with a `<$tiddler>/<$transclude>` wrapper pointing to the view template
+# The modified tiddler is returned from the hook
+
+!!! Command tiddler structure
+
+|!Field |!Value |
+|`title` |`<OriginalTitle>/@<Target>/<timestamp>` |
+|`tags` |Outbox tag (default: `ext-outbox`) |
+|`text` |The extracted command text |
+|`source` |Original tiddler title |
+|`target` |Target name (e.g. `LLM`) |
+|`command-text` |The extracted command text (also in `text`) |
+|`status` |`pending` (updatable by external tools) |
+
+!!! FileSystemPaths routing
+
+A `$:/config/FileSystemPaths` entry routes outbox-tagged tiddlers to `tiddlers/ext-outbox/`:
+```
+[tag[ext-outbox]addprefix[ext-outbox/]]
+```
+
+External tools need only watch `mywiki/tiddlers/ext-outbox/`.
+
+!!! Loop prevention
+
+* Command tiddlers get the outbox tag, not the scan-filter tag → no re-extraction
+* Modified original has transclusions instead of `@Target` text → no re-extraction on next save
+* filesystem-watcher re-imports trigger `change` events, not navigator saves → hook doesn't fire
+
+!!! Text-command syntax
+
+''Single-line'': `@Target` followed by non-whitespace on the same line
+```
+@LLM summarize the above paragraph
+```
+
+''Multi-line'': `@Target` on its own line, content until closing `Target@`
+```
+@LLM
+Please review the following code.
+Focus on performance.
+LLM@
+```
+
+!! Context rendering (outbound → external tool)
+
+After a command tiddler lands in `ext-outbox/`, an external tool needs rendered context (source content, command text, metadata) to process the command.
+
+!!! Rendering flow
+
+# External tool detects new `.tid` file in `ext-outbox/`
+# Runs: `npx tiddlywiki mywiki --render "[[CmdTitle]]" "[[context.txt]]" "text/plain" "$:/config/rimir/text-command/delegate"`
+# Delegate template (`$:/config/rimir/text-command/delegate`) uses `:cascade` to select the right context template
+# Cascade selectors (tagged `$:/tags/rimir/text-command/context-template`, sorted by `order`) are evaluated against the command tiddler
+# First selector whose filter returns non-empty wins → returns a context render template title
+# That template is transcluded, producing plain-text output
+# External tool reads `mywiki/output/context.txt`
+# Results come back via `POST /api/ext-connect/put-tiddler`
+
+!!! Cascade pattern
+
+The delegate template defines a `ctx.template()` function:
+
+```
+\function ctx.template() [all[current]] :cascade[all[shadows+tiddlers]tag[$:/tags/rimir/text-command/context-template]sort[order]!is[draft]get[text]]
+```
+
+Each cascade selector tiddler's `text` is a filter expression that tests the command tiddler and returns a context template title if it matches. Example:
+
+```
+[all[current]get[target]match[LLM]then[$:/config/rimir/text-command/ctx/llm]]
+```
+
+!!! Adding a new target context
+
+Create two tiddlers:
+
+# ''Cascade selector'': tagged `$:/tags/rimir/text-command/context-template`, with an `order` field and a filter expression as `text`
+# ''Context render template'': wikitext tiddler producing the plain-text output (`currentTiddler` = command tiddler)
+
+No JS changes, no restart needed.
+
+!! Design decisions
+
+* ''TW filters over custom DSL'': template field values are real TW filter expressions — composable, powerful, no custom parser needed
+* ''`out.` prefix convention'': clean escape mechanism for reserved field names without inventing new syntax
+* ''Action widgets for side effects'': TW's `invokeActionString()` works server-side with `$tw.fakeDocument` — no DOM needed
+* ''First-match rules'': ordered array, first match wins — simple and predictable
+* ''Template tiddlers in wiki store'': editable from browser, no restart needed for config changes
+* ''CLI-primary, POST fallback'': CLI `--import` is the primary inbound path; the POST endpoint shares the same `resolve.js` pipeline but may be deprecated
+
+</$fill>
+</$transclude>

@@ -1,0 +1,142 @@
+created: 20260305110552553
+modified: 20260305110552553
+rdt.order: 5
+rdt.plugin-key: ext-connect
+rdt.plugin-name: ext connect
+rdt.plugin-subtitle: CLI-first inbound path for external tools — context resolution, templates, and outbound text-commands
+rdt.section: Examples
+title: $:/plugins/rimir/ext-connect/doc/examples
+type: text/vnd.tiddlywiki
+
+<$transclude $tiddler="$:/plugins/rimir/doc-template/templates/page">
+<$fill $name="body">
+
+All examples use CLI import — the primary inbound path. The same JSON format works with the POST fallback endpoint.
+
+!! Basic tiddler push
+
+Minimal input — creates a tiddler using the `default` profile template:
+
+```json
+{"text": "Hello from external tool"}
+```
+
+```
+TIDDLYWIKI_CLI_MODE=1 npx tiddlywiki mywiki --import input.json application/x-rimir-ext-connect
+```
+
+''Result'': tiddler created at `Inbox/<timestamp>` with the `Inbox` tag (from the default template).
+
+---
+
+!! Explicit title and fields
+
+Override the generated title and add custom fields:
+
+```json
+{
+  "text": "Meeting with the team about Q2 roadmap",
+  "title": "Meetings/2026-03-05 Q2 Roadmap",
+  "fields": {
+    "tags": "Meeting Q2",
+    "attendees": "Alice Bob Carol"
+  }
+}
+```
+
+''Result'': tiddler at `Meetings/2026-03-05 Q2 Roadmap` with explicit tags and custom `attendees` field. Explicit `fields` override template-generated values.
+
+---
+
+!! Profile-based creation
+
+Use a named profile to select a different template:
+
+```json
+{
+  "text": "Discussed sprint goals and blockers",
+  "profile": "meeting-note"
+}
+```
+
+The `meeting-note` profile maps to a template tiddler that sets a title prefix, tags, and other fields via TW filter expressions.
+
+''Result'': tiddler created with the meeting-note template's title pattern, tags, and fields.
+
+---
+
+!! Context resolution
+
+Pass context tiddlers so templates and rules can reference their fields:
+
+```json
+{
+  "text": "This is a reply to the stream",
+  "context": ["MyProject/Stream"]
+}
+```
+
+The `context` array names existing wiki tiddlers. Their fields become available as variables in template filter expressions:
+
+* `context-titles` — space-separated list of context titles
+* `context.0.title` — title of the first context tiddler
+* `context.0.fields.tags` — tags field of the first context tiddler
+* `context.0.fields.<any-field>` — any field from the first context tiddler
+
+A rule might match on context: `[enlist<context-titles>has[streams-default]limit[1]]` — if any context tiddler has a `streams-default` field, the rule fires and selects a stream-reply template.
+
+''Result'': the stream-reply template generates a title like `MyProject/Stream/<timestamp>`, sets `parent` to the context tiddler, and runs post-creation actions (e.g. appending the new title to the parent's `list` field).
+
+---
+
+!! Post-creation actions
+
+Template tiddlers can have action widgets in their `text` field that execute after the tiddler is created. Example template:
+
+```
+title: $:/config/rimir/ext-connect/tpl/stream-reply
+out.title: [<context.0.title>addsuffix[/]addsuffix<timestamp>]
+out.tags: [[StreamReply]]
+parent: [<context.0.title>]
+
+<$action-listops $tiddler=<<context.0.title>> $field="list" $subfilter="[<new-title>]"/>
+```
+
+When a tiddler is created with this template:
+
+# `out.title` → generates title from context + timestamp
+# `out.tags` → adds `StreamReply` tag
+# `parent` → set to the context tiddler's title
+# `text` (actions) → appends the new tiddler's title to the parent's `list` field
+
+The `new-title` variable is only available in the action phase (after the tiddler is saved).
+
+---
+
+!! Rule-based matching
+
+Rules are evaluated in order — first match wins. Each rule has a TW `filter` and one or more `templates`:
+
+```json
+[
+  {
+    "name": "stream-reply",
+    "filter": "[enlist<context-titles>has[streams-default]limit[1]]",
+    "templates": ["$:/config/rimir/ext-connect/tpl/stream-reply"]
+  },
+  {
+    "name": "discussion-reply",
+    "filter": "[enlist<context-titles>tag[Discussion]limit[1]]",
+    "templates": ["$:/config/rimir/ext-connect/tpl/discussion-reply"]
+  }
+]
+```
+
+With this rules config and `"context": ["SomeTiddler"]`:
+
+* If `SomeTiddler` has a `streams-default` field → `stream-reply` rule matches → uses `tpl/stream-reply`
+* If `SomeTiddler` is tagged `Discussion` → `discussion-reply` rule matches → uses `tpl/discussion-reply`
+* If neither matches → no rule-derived fields (profile + explicit fields still apply)
+
+</$fill>
+</$transclude>
