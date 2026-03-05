@@ -29,6 +29,10 @@ Where `input.json` contains: `{"text": "Hello", "title": "MyTiddler"}`
 
 **Fallback: POST API** (may be deprecated) -- if a server is running, you can also use `POST /api/ext-connect/put-tiddler` with `X-Requested-With: TiddlyWiki` header. See the reference docs for details.
 
+## Plugin Library
+
+Install from the [rimir plugin library](https://rimir-cc.github.io/tw-plugin-library/) via *Control Panel → Plugins → Get more plugins*.
+
 ## License
 
 MIT -- see [LICENSE.md](LICENSE.md)
