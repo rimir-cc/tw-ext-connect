@@ -2,9 +2,9 @@
     "title": "$:/plugins/rimir/ext-connect",
     "description": "HTTP endpoint for external tools — inbound (push tiddlers) and outbound (text-command extraction)",
     "author": "rimir",
-    "version": "0.1.0",
+    "version": "0.1.1",
     "core-version": ">=5.3.0",
     "source": "https://github.com/rimir-cc/tw-ext-connect",
     "plugin-type": "plugin",
-    "list": "readme settings"
+    "list": "readme documentation settings changelog license"
 }

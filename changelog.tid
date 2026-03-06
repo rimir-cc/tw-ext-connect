@@ -6,4 +6,5 @@ type: text/vnd.tiddlywiki
 ! Changelog
 
 |!Version |!Date |!Changes |
+|v0.1.1 |2026-03-06 |Standardize plugin tabs: add documentation/changelog/license to list, replace license.tid with LICENSE.md.meta sidecar |
 |v0.1.0 |2026 |Initial release |
