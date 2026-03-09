@@ -18,7 +18,7 @@ exports.before = ["commands"];
 exports.platforms = ["node"];
 exports.synchronous = true;
 
-var RULE = "[tag[ext-outbox]addprefix[ext-outbox/]]";
+var RULE = "[tag[ext-outbox]!has[draft.of]addprefix[ext-outbox/]]";
 var TIDDLER = "$:/config/FileSystemPaths";
 
 exports.startup = function() {

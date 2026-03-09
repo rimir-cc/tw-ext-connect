@@ -11,6 +11,104 @@ type: text/vnd.tiddlywiki
 <$transclude $tiddler="$:/plugins/rimir/doc-template/templates/page">
 <$fill $name="body">
 
+!! Protocol field spec
+
+ext-connect uses a fixed set of field names shared across the wiki-side JS modules, the Python connector, and the resolution pipeline. These field names are ''not configurable'' — they form a tightly coupled contract between all components.
+
+!!! Inbound JSON payload (POST body / CLI `--import`)
+
+|!Field |!Required |!Type |!Description |
+|`text` |Yes |string |Tiddler content body |
+|`title` |No |string |Explicit title (overrides template-generated title) |
+|`profile` |No |string |Profile name from `$:/config/rimir/ext-connect/profiles` |
+|`context` |No |string[] |Tiddler titles loaded from wiki store for rule matching and variable building |
+|`fields` |No |object |Explicit field overrides, merged after template/rule evaluation |
+
+!!! Text-command tiddler fields (ext-outbox)
+
+Created by `text-command.js` when extracting `@Target` commands from tiddler text. These `.tid` files land in `ext-outbox/` for external tools to pick up.
+
+|!Field |!Value |!Notes |
+|`title` |`<OriginalTitle>/@<Target>/<timestamp>` |Auto-generated composite title |
+|`tags` |Outbox tag (default: `ext-outbox`) |Configurable via `$:/config/rimir/text-command/outbox-tag` |
+|`text` |Extracted command text |Same content as `command-text` |
+|`source` |Title of originating tiddler |Links reply back to origin |
+|`target` |Target name (e.g. `LLM`) |Case-sensitive, must be in registered targets list |
+|`command-text` |Extracted command text |Duplicate of `text` for explicit field access |
+|`status` |`pending` |Updated by external tools: `pending` → `processing` → `done` / `error` |
+|`type` |`text/vnd.tiddlywiki` | |
+|`created` |TW timestamp | |
+|`modified` |TW timestamp | |
+
+!!! Status lifecycle
+
+```
+pending → processing → done
+                     → error
+```
+
+Set by external tools (e.g. Python connector). The wiki-side view template reflects status changes live.
+
+!!! Template output fields (`out.` prefix)
+
+|!Field pattern |!Behavior |
+|`out.<fieldname>` |Strip `out.` prefix; value evaluated as TW filter → output field |
+|Non-reserved field |Output field directly; value evaluated as TW filter |
+|Reserved field |Skipped as output (template metadata only) |
+|`text` (body) |Collected as action widget markup, executed after tiddler creation |
+
+Reserved fields (never output): `title`, `text`, `type`, `tags`, `created`, `modified`, `creator`, `modifier`, `bag`, `revision`
+
+!!! Variables (available in template filters and actions)
+
+|!Variable |!Scope |!Description |
+|`timestamp` |filters + actions |UTC `YYYYMMDDHHMMSSMMM` |
+|`profile` |filters + actions |Profile name from request (empty string if absent) |
+|`context-titles` |filters + actions |Space-separated list of context tiddler titles |
+|`context.<N>.title` |filters + actions |Title of Nth context tiddler (0-indexed) |
+|`context.<N>.fields.<X>` |filters + actions |Field X of Nth context tiddler |
+|`new-title` |actions only |Title of the just-created tiddler |
+
+!!! Auto-generated output fields
+
+|!Field |!Value |!Condition |
+|`title` |`Inbox/<timestamp>` |Only if not set by template, rule, or explicit override |
+|`type` |`text/vnd.tiddlywiki` |Only if not already set |
+|`created` |Current TW timestamp |Only if not already set |
+|`modified` |Current TW timestamp |Always set/overwritten |
+
+!!! Config tiddlers
+
+|!Tiddler |!Type |!Purpose |
+|`$:/config/rimir/ext-connect/profiles` |`application/json` |Profile name → template tiddler title mapping |
+|`$:/config/rimir/ext-connect/rules` |`application/json` |Ordered rules: filter + template tiddler titles |
+|`$:/config/rimir/text-command/targets` |`application/json` |Registered target names for `@Target` extraction |
+|`$:/config/rimir/text-command/outbox-tag` |text |Tag for command tiddlers (default: `ext-outbox`) |
+|`$:/config/rimir/text-command/scan-filter` |text |Filter determining which tiddlers are scanned for commands |
+|`$:/config/rimir/text-command/view-template` |text |Template rendered inline where commands were extracted |
+|`$:/config/rimir/text-command/delegate` |wikitext |Cascade dispatcher for context rendering |
+
+!!! Python connector field mapping
+
+The Python `tw_connector` library maps `.tid` fields to dataclass attributes:
+
+|!.tid field |!Python `Command` attr |!Type |
+|`title` |`title` |`str` |
+|`target` |`target` |`str` |
+|`command-text` |`command_text` |`str` |
+|`source` |`source` |`str` |
+|`status` |`status` |`CommandStatus` enum |
+|`text` |`text` |`str` |
+|`created` |`created` |`str` |
+|`modified` |`modified` |`str` |
+|(file path) |`file_path` |`Path` |
+|(all fields) |`fields` |`dict[str, str]` |
+|(rendered) |`context` |`str | None` |
+
+The `Reply` dataclass maps back to the inbound JSON payload: `text`, `title`, `profile`, `context` (list[str]), `fields` (dict).
+
+---
+
 !! CLI import (`--import`) — primary inbound path
 
 Import tiddlers via the CLI using the same JSON format and resolution pipeline:
