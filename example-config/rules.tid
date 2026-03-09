@@ -1,0 +1,12 @@
+created: 20260309120000000
+modified: 20260309120000000
+title: $:/config/rimir/ext-connect/rules
+type: application/json
+
+[
+  {
+    "name": "stream-reply-default",
+    "filter": "[<context.0.fields.stream-type>match[default]]",
+    "templates": ["$:/config/rimir/ext-connect/tpl/stream-reply-default"]
+  }
+]

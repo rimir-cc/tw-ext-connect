@@ -1,0 +1,12 @@
+created: 20260309132731969
+modified: 20260309141942415
+tags: 
+title: $:/config/rimir/text-command/ctx/streams
+type: text/vnd.tiddlywiki
+
+Current communication protocol:
+=======
+<$list filter="[kin:parent:from{!!source}]-[{!!source}]:filter[get[text]!is[blank]]" join="<br>">user: <$transclude/></$list>
+=======
+
+{{{[{!!source}get[text]]}}}

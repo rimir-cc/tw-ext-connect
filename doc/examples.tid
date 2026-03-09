@@ -13,6 +13,93 @@ type: text/vnd.tiddlywiki
 
 All examples use CLI import — the primary inbound path. The same JSON format works with the POST fallback endpoint.
 
+<div class="rr-tabs">
+<$button set="$:/state/rimir/ext-connect/examples-tab" setTo="command-reply" class={{{ [{$:/state/rimir/ext-connect/examples-tab}match[command-reply]then[rr-tab rr-tab-active]else[rr-tab]] ~[[rr-tab rr-tab-active]] }}}> Command reply </$button>
+<$button set="$:/state/rimir/ext-connect/examples-tab" setTo="basic" class={{{ [{$:/state/rimir/ext-connect/examples-tab}match[basic]then[rr-tab rr-tab-active]else[rr-tab]] }}}> Basic push </$button>
+<$button set="$:/state/rimir/ext-connect/examples-tab" setTo="fields" class={{{ [{$:/state/rimir/ext-connect/examples-tab}match[fields]then[rr-tab rr-tab-active]else[rr-tab]] }}}> Title & fields </$button>
+<$button set="$:/state/rimir/ext-connect/examples-tab" setTo="context" class={{{ [{$:/state/rimir/ext-connect/examples-tab}match[context]then[rr-tab rr-tab-active]else[rr-tab]] }}}> Context </$button>
+<$button set="$:/state/rimir/ext-connect/examples-tab" setTo="actions" class={{{ [{$:/state/rimir/ext-connect/examples-tab}match[actions]then[rr-tab rr-tab-active]else[rr-tab]] }}}> Actions </$button>
+<$button set="$:/state/rimir/ext-connect/examples-tab" setTo="rules" class={{{ [{$:/state/rimir/ext-connect/examples-tab}match[rules]then[rr-tab rr-tab-active]else[rr-tab]] }}}> Rules </$button>
+</div>
+
+<!-- ===== COMMAND REPLY ===== -->
+
+<$reveal stateTitle="$:/state/rimir/ext-connect/examples-tab" type="match" text="command-reply" default="command-reply">
+
+!! Answering a command (full round-trip)
+
+An external tool processes a command tiddler from `ext-outbox/` and sends the result back. The inbound pipeline links the answer to the original command.
+
+!!! Setup
+
+The command tiddler (created via `@Dodo` field or inline `@Dodo` text) sits in `ext-outbox/` with these fields:
+
+|!Field |!Value |!Source |
+|`target` |`Dodo` |Set by text-command extraction |
+|`command-text` |`process` |Value of the `@Dodo` field |
+|`source` |`MyNote` |Original tiddler title |
+|`status` |`pending` |Auto-set |
+|`stream-type` |`default` |Set by user before saving |
+
+The rule `stream-reply-default` matches when `context.0.fields.stream-type` equals `default`.
+
+!!! Inbound JSON
+
+The external tool sends back the processed result with the command tiddler as context:
+
+```json
+{
+  "text": "Here is the processed result",
+  "context": ["MyNote/@Dodo/20260309130505927"]
+}
+```
+
+```
+TIDDLYWIKI_CLI_MODE=1 npx tiddlywiki dev-wiki --import input.json application/x-rimir-ext-connect
+```
+
+!!! What happens
+
+# ''Default profile'' → title becomes `Inbox/<timestamp>`, tagged `Inbox`
+# ''Rule matches'' → `stream-reply-default` fires because the context tiddler has `stream-type: default`
+# ''Template applied'' → `parent` field set to the command tiddler's title
+# ''Post-creation action'' → the command tiddler's `stream-list` field gets the new tiddler's title appended
+
+!!! Result
+
+The new tiddler at `Inbox/<timestamp>`:
+
+|!Field |!Value |
+|`text` |`Here is the processed result` |
+|`tags` |`Inbox` |
+|`parent` |`MyNote/@Dodo/20260309130505927` |
+
+The command tiddler now has:
+
+|!Field |!Value |
+|`stream-list` |`Inbox/20260309140000000` |
+
+!!! Overrides
+
+The external tool can override any field:
+
+```json
+{
+  "text": "Here is the processed result",
+  "title": "Dodo/Response/2026-03-09",
+  "context": ["MyNote/@Dodo/20260309130505927"],
+  "fields": {"status": "complete", "confidence": "high"}
+}
+```
+
+`body.title` wins over the template-generated title. `body.fields` merge on top of everything.
+
+</$reveal>
+
+<!-- ===== BASIC PUSH ===== -->
+
+<$reveal stateTitle="$:/state/rimir/ext-connect/examples-tab" type="match" text="basic">
+
 !! Basic tiddler push
 
 Minimal input — creates a tiddler using the `default` profile template:
@@ -22,12 +109,16 @@ Minimal input — creates a tiddler using the `default` profile template:
 ```
 
 ```
-TIDDLYWIKI_CLI_MODE=1 npx tiddlywiki mywiki --import input.json application/x-rimir-ext-connect
+TIDDLYWIKI_CLI_MODE=1 npx tiddlywiki dev-wiki --import input.json application/x-rimir-ext-connect
 ```
 
-''Result'': tiddler created at `Inbox/<timestamp>` with the `Inbox` tag (from the default template).
+''Result'': tiddler created at `Inbox/<timestamp>` with the `Inbox` tag (from the default profile template).
 
----
+</$reveal>
+
+<!-- ===== TITLE & FIELDS ===== -->
+
+<$reveal stateTitle="$:/state/rimir/ext-connect/examples-tab" type="match" text="fields">
 
 !! Explicit title and fields
 
@@ -46,24 +137,11 @@ Override the generated title and add custom fields:
 
 ''Result'': tiddler at `Meetings/2026-03-05 Q2 Roadmap` with explicit tags and custom `attendees` field. Explicit `fields` override template-generated values.
 
----
+</$reveal>
 
-!! Profile-based creation
+<!-- ===== CONTEXT ===== -->
 
-Use a named profile to select a different template:
-
-```json
-{
-  "text": "Discussed sprint goals and blockers",
-  "profile": "meeting-note"
-}
-```
-
-The `meeting-note` profile maps to a template tiddler that sets a title prefix, tags, and other fields via TW filter expressions.
-
-''Result'': tiddler created with the meeting-note template's title pattern, tags, and fields.
-
----
+<$reveal stateTitle="$:/state/rimir/ext-connect/examples-tab" type="match" text="context">
 
 !! Context resolution
 
@@ -78,16 +156,19 @@ Pass context tiddlers so templates and rules can reference their fields:
 
 The `context` array names existing wiki tiddlers. Their fields become available as variables in template filter expressions:
 
-* `context-titles` — space-separated list of context titles
-* `context.0.title` — title of the first context tiddler
-* `context.0.fields.tags` — tags field of the first context tiddler
-* `context.0.fields.<any-field>` — any field from the first context tiddler
+|!Variable |!Value |
+|`context-titles` |Space-separated list of context titles |
+|`context.0.title` |Title of the first context tiddler |
+|`context.0.fields.tags` |Tags field of the first context tiddler |
+|`context.0.fields.<any-field>` |Any field from the first context tiddler |
 
 A rule might match on context: `[enlist<context-titles>has[streams-default]limit[1]]` — if any context tiddler has a `streams-default` field, the rule fires and selects a stream-reply template.
 
-''Result'': the stream-reply template generates a title like `MyProject/Stream/<timestamp>`, sets `parent` to the context tiddler, and runs post-creation actions (e.g. appending the new title to the parent's `list` field).
+</$reveal>
 
----
+<!-- ===== ACTIONS ===== -->
+
+<$reveal stateTitle="$:/state/rimir/ext-connect/examples-tab" type="match" text="actions">
 
 !! Post-creation actions
 
@@ -111,7 +192,11 @@ When a tiddler is created with this template:
 
 The `new-title` variable is only available in the action phase (after the tiddler is saved).
 
----
+</$reveal>
+
+<!-- ===== RULES ===== -->
+
+<$reveal stateTitle="$:/state/rimir/ext-connect/examples-tab" type="match" text="rules">
 
 !! Rule-based matching
 
@@ -120,9 +205,9 @@ Rules are evaluated in order — first match wins. Each rule has a TW `filter` a
 ```json
 [
   {
-    "name": "stream-reply",
-    "filter": "[enlist<context-titles>has[streams-default]limit[1]]",
-    "templates": ["$:/config/rimir/ext-connect/tpl/stream-reply"]
+    "name": "stream-reply-default",
+    "filter": "[<context.0.fields.stream-type>match[default]]",
+    "templates": ["$:/config/rimir/ext-connect/tpl/stream-reply-default"]
   },
   {
     "name": "discussion-reply",
@@ -132,11 +217,13 @@ Rules are evaluated in order — first match wins. Each rule has a TW `filter` a
 ]
 ```
 
-With this rules config and `"context": ["SomeTiddler"]`:
+With `"context": ["SomeTiddler"]`:
 
-* If `SomeTiddler` has a `streams-default` field → `stream-reply` rule matches → uses `tpl/stream-reply`
-* If `SomeTiddler` is tagged `Discussion` → `discussion-reply` rule matches → uses `tpl/discussion-reply`
+* If `SomeTiddler` has `stream-type: default` → `stream-reply-default` matches → sets `parent`, appends to `stream-list`
+* If `SomeTiddler` is tagged `Discussion` → `discussion-reply` matches → uses `tpl/discussion-reply`
 * If neither matches → no rule-derived fields (profile + explicit fields still apply)
+
+</$reveal>
 
 </$fill>
 </$transclude>

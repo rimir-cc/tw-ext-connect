@@ -3,8 +3,10 @@ title: $:/plugins/rimir/ext-connect/text-command
 type: application/javascript
 module-type: startup
 
-Browser-side th-saving-tiddler hook: extracts @Target commands from tiddler text,
-creates command tiddlers tagged for ext-outbox routing, and replaces commands with transclusions.
+Browser-side th-saving-tiddler hook with two command modes:
+1. Field-based: a @Target field (e.g. @Dodo) turns the whole tiddler into a command —
+   tags it for ext-outbox, sets target/command-text/status/source, strips the trigger field.
+2. Inline: extracts @Target text patterns, creates separate command tiddlers, replaces with transclusions.
 \*/
 (function(){
 
@@ -31,6 +33,53 @@ exports.startup = function() {
 		}
 		if(!Array.isArray(targets) || targets.length === 0) return newTiddler;
 
+		// --- Field-based command detection ---
+		// A tiddler with a @Target field (e.g. @Dodo) becomes a command itself.
+		// The field value is the instruction; the field is stripped after processing.
+		var fieldOverrides = {};
+		var fieldCommandTarget = null;
+		var fieldNames = Object.keys(newTiddler.fields);
+		for(var fi = 0; fi < fieldNames.length; fi++) {
+			var fname = fieldNames[fi];
+			if(fname.charAt(0) !== "@") continue;
+			var candidateTarget = fname.substring(1);
+			for(var ti = 0; ti < targets.length; ti++) {
+				if(targets[ti] === candidateTarget) {
+					fieldCommandTarget = candidateTarget;
+					break;
+				}
+			}
+			if(fieldCommandTarget) break;
+		}
+		if(fieldCommandTarget) {
+			var outboxTagField = $tw.wiki.getTiddlerText("$:/config/rimir/text-command/outbox-tag", "ext-outbox").trim();
+			var existingTags = newTiddler.fields.tags || [];
+			if(!Array.isArray(existingTags)) {
+				existingTags = $tw.utils.parseStringArray(existingTags) || [];
+			}
+			var tags = existingTags.slice();
+			if(tags.indexOf(outboxTagField) === -1) {
+				tags.push(outboxTagField);
+			}
+			fieldOverrides.tags = tags;
+			fieldOverrides.target = fieldCommandTarget;
+			fieldOverrides["command-text"] = newTiddler.fields["@" + fieldCommandTarget] || "";
+			fieldOverrides.source = newTiddler.fields.title;
+			if(!newTiddler.fields.status) {
+				fieldOverrides.status = "pending";
+			}
+			// Strip the @Target trigger field
+			var strippedFields = {};
+			var allFields = Object.keys(newTiddler.fields);
+			for(var si = 0; si < allFields.length; si++) {
+				if(allFields[si] !== "@" + fieldCommandTarget) {
+					strippedFields[allFields[si]] = newTiddler.fields[allFields[si]];
+				}
+			}
+			newTiddler = new $tw.Tiddler(strippedFields, fieldOverrides);
+		}
+
+		// --- Inline text-command extraction ---
 		var scanFilter = $tw.wiki.getTiddlerText("$:/config/rimir/text-command/scan-filter", "").trim();
 		if(!scanFilter) return newTiddler;
 

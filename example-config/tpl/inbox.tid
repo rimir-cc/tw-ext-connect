@@ -1,0 +1,6 @@
+created: 20260309130000000
+modified: 20260309130000000
+title: $:/config/rimir/ext-connect/tpl/inbox
+type: text/vnd.tiddlywiki
+out.title: [<timestamp>addprefix[Inbox/]]
+out.tags: [[Inbox]]

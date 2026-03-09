@@ -142,7 +142,7 @@ The delegate template dispatches to context render templates via `:cascade`. Eva
 
 <table class="rr-table">
 <tr><th>Order</th><th>Selector</th><th>Filter</th></tr>
-<$list filter="[all[shadows+tiddlers]tag[$:/tags/rimir/text-command/context-template]sort[order]]">
+<$list filter="[all[shadows+tiddlers]tag[$:/tags/rimir/text-command/context-template]nsort[order]]">
 <tr>
 <td>{{!!order}}</td>
 <td><$link/></td>

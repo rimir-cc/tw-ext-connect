@@ -1,0 +1,8 @@
+created: 20260309132458353
+modified: 20260309132711454
+order: 90
+tags: $:/tags/rimir/text-command/context-template
+title: $:/config/rimir/text-command/cascade/streams
+type: text/vnd.tiddlywiki
+
+[all[current]has[target]get[stream-type]match[default]then[$:/config/rimir/text-command/ctx/streams]]

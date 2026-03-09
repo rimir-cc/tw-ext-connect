@@ -1,0 +1,8 @@
+created: 20260309120000000
+modified: 20260309120000000
+title: $:/config/rimir/ext-connect/tpl/stream-reply-default
+type: text/vnd.tiddlywiki
+parent: [<context.0.title>]
+
+<$action-listops $tiddler=<<context.0.title>> $field="stream-list" $subfilter="[<new-title>]"/>
+<$action-setfield $tiddler=<<context.0.title>> status="done"/>

@@ -1,0 +1,8 @@
+created: 20260309120000000
+modified: 20260309120000000
+title: $:/config/rimir/ext-connect/profiles
+type: application/json
+
+{
+  "default": "$:/config/rimir/ext-connect/tpl/inbox"
+}

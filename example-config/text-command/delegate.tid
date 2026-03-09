@@ -3,5 +3,5 @@ modified: 20260309090956604
 title: $:/config/rimir/text-command/delegate
 type: text/vnd.tiddlywiki
 
-\function ctx.template() [all[current]] :cascade[all[shadows+tiddlers]tag[$:/tags/rimir/text-command/context-template]sort[order]!is[draft]get[text]]
+\function ctx.template() [all[current]] :cascade[all[shadows+tiddlers]tag[$:/tags/rimir/text-command/context-template]nsort[order]!is[draft]get[text]]
 <$transclude $tiddler={{{ [ctx.template[]] }}} />
