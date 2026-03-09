@@ -1,0 +1,9 @@
+title: $:/config/rimir/text-command/ctx/default
+type: text/vnd.tiddlywiki
+
+Command: {{!!command-text}}
+
+Source tiddler: {{!!source}}
+
+Source content:
+<$transclude tiddler={{!!source}} field="text" />

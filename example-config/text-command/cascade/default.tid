@@ -1,0 +1,8 @@
+created: 20260309084147786
+modified: 20260309084147786
+order: 999
+tags: $:/tags/rimir/text-command/context-template
+title: $:/config/rimir/text-command/cascade/default
+type: text/vnd.tiddlywiki
+
+[all[current]then[$:/config/rimir/text-command/ctx/default]]

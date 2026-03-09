@@ -1,0 +1,11 @@
+title: $:/config/rimir/text-command/ctx/dodo
+type: text/vnd.tiddlywiki
+
+Command: {{!!command-text}}
+
+Source tiddler: {{!!source}}
+
+Tags: <$transclude tiddler={{!!source}} field="tags" />
+
+Source content:
+<$transclude tiddler={{!!source}} field="text" />

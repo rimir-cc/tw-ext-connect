@@ -1,0 +1,10 @@
+created: 20260309091014715
+modified: 20260309091014715
+title: $:/config/rimir/text-command/view-template
+type: text/vnd.tiddlywiki
+
+<div class="rr-notice rr-notice-info">
+
+"{{!!command-text}}" is being processed (status: {{!!status}})
+
+</div>

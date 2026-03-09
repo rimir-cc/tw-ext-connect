@@ -1,0 +1,8 @@
+created: 20260309084141963
+modified: 20260309084141963
+order: 100
+tags: $:/tags/rimir/text-command/context-template
+title: $:/config/rimir/text-command/cascade/target-llm
+type: text/vnd.tiddlywiki
+
+[all[current]get[target]match[LLM]then[$:/config/rimir/text-command/ctx/llm]]

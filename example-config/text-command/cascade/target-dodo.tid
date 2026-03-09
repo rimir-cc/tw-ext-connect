@@ -1,0 +1,8 @@
+created: 20260309084134522
+modified: 20260309084134522
+order: 100
+tags: $:/tags/rimir/text-command/context-template
+title: $:/config/rimir/text-command/cascade/target-dodo
+type: text/vnd.tiddlywiki
+
+[all[current]get[target]match[Dodo]then[$:/config/rimir/text-command/ctx/dodo]]
