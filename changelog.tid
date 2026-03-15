@@ -6,6 +6,7 @@ type: text/vnd.tiddlywiki
 ! Changelog
 
 |!Version |!Date |!Changes |
+|v0.1.4 |2026-03-15 |Add regression tests and CI test gate |
 |v0.1.3 |2026-03-09 |Add field-based @Target commands, inbound profiles/rules/templates with example config, fix cascade nsort, tabbed examples doc |
 |v0.1.2 |2026-03-09 |Add Python connector (tw_connector) and example config for text-command outbound system |
 |v0.1.1 |2026-03-06 |Standardize plugin tabs: add documentation/changelog/license to list, replace license.tid with LICENSE.md.meta sidecar |
