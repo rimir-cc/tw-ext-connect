@@ -4,7 +4,7 @@ tags: $:/tags/Stylesheet
 title: $:/plugins/rimir/ext-connect/text-command-styles
 type: text/vnd.tiddlywiki
 
-.tc-ext-command {
+.ec-command {
 	border-left: 3px solid <<colour primary>>;
 	padding: 4px 8px;
 	margin: 4px 0;
@@ -12,16 +12,16 @@ type: text/vnd.tiddlywiki
 	border-radius: 3px;
 }
 
-.tc-ext-command-target {
+.ec-command-target {
 	font-weight: bold;
 	color: <<colour primary>>;
 }
 
-.tc-ext-command-text {
+.ec-command-text {
 	font-style: italic;
 }
 
-.tc-ext-command-status {
+.ec-command-status {
 	font-size: 0.85em;
 	color: <<colour muted-foreground>>;
 	margin-top: 2px;
