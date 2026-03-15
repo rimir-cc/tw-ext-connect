@@ -1,7 +1,8 @@
 {
     "description": "Test edition for ext-connect",
     "plugins": [
-        "tiddlywiki/jasmine"
+        "tiddlywiki/jasmine",
+        "rimir/ext-connect"
     ],
     "themes": [
         "tiddlywiki/vanilla",
