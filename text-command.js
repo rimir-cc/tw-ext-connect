@@ -21,6 +21,7 @@ exports.synchronous = true;
 
 exports.startup = function() {
 	$tw.hooks.addHook("th-saving-tiddler", function(newTiddler) {
+		if(!newTiddler) return newTiddler;
 		// Read config
 		var targetsText = $tw.wiki.getTiddlerText("$:/config/rimir/text-command/targets", "").trim();
 		if(!targetsText) return newTiddler;

@@ -1,0 +1,43 @@
+created: 20260315120000000
+modified: 20260315120000000
+rdt.order: 6
+rdt.plugin-key: ext-connect
+rdt.plugin-name: ext connect
+rdt.plugin-subtitle: CLI-first inbound path for external tools — context resolution, templates, and outbound text-commands
+rdt.section: TW Internals
+title: $:/plugins/rimir/ext-connect/doc/tw-internals
+type: text/vnd.tiddlywiki
+
+<$transclude $tiddler="$:/plugins/rimir/doc-template/templates/page">
+<$fill $name="body">
+
+!! tiddlerdeserializer module type
+
+`deserializer.js` registers the custom MIME type `application/x-rimir-ext-connect`. TiddlyWiki's `--import` command looks up deserializers by MIME type and calls them with the raw file content. The deserializer parses JSON and runs the resolution pipeline.
+
+!! $tw.utils.saveTiddlerToFileSync
+
+Used by the CLI path to write `.tid` files directly to disk. Combines `generateTiddlerFileInfo()` (which respects `$:/config/FileSystemPaths` routing rules) with synchronous file writing. The server's syncer is not involved.
+
+!! $tw.syncer.tiddlerInfo / changeCount
+
+The POST path uses a syncer mismatch pattern: after `addTiddler()`, it sets `tiddlerInfo[title].changeCount` to `wiki.getChangeCount() - 1`. The syncer detects the mismatch on its next tick and writes the file to disk. This is the inverse of filesystem-watcher's pattern (which matches counts to prevent writes).
+
+!! invokeActionString
+
+Server-side action execution uses `$tw.rootWidget.invokeActionString()` with a real `Widget` instance and `$tw.fakeDocument` (TW's server-side fake DOM). This enables action widgets like `<$action-listops>` and `<$action-setfield>` to execute without a browser environment.
+
+!! th-saving-tiddler hook
+
+The `text-command.js` module hooks `th-saving-tiddler` to intercept tiddler saves in the browser. When a saved tiddler matches the scan filter, it extracts `@Target` commands, creates command tiddlers, and replaces the command text with transclusion markup — all before the save completes.
+
+!! $:/config/FileSystemPaths
+
+A system tiddler containing filter expressions that route tiddlers to subdirectories on disk. The `filesystem-paths-setup.js` startup module prepends a rule for outbox-tagged tiddlers so command tiddlers land in `tiddlers/ext-outbox/`.
+
+!! includeWikis
+
+The CLI wrapper (`mywiki-cli/tiddlywiki.info`) uses `includeWikis` to reference the main wiki read-only. TiddlyWiki merges the included wiki's tiddler store, plugins, and config into the wrapper. The deserializer resolves the first `includeWikis` entry to determine the correct write target for `.tid` files.
+
+</$fill>
+</$transclude>

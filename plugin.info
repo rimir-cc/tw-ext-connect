@@ -3,7 +3,7 @@
     "description": "HTTP endpoint for external tools — inbound (push tiddlers) and outbound (text-command extraction)",
     "name": "ext connect",
     "author": "rimir",
-    "version": "0.1.5",
+    "version": "0.1.6",
     "core-version": ">=5.3.0",
     "source": "https://github.com/rimir-cc/tw-ext-connect",
     "plugin-type": "plugin",

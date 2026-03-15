@@ -1,0 +1,27 @@
+created: 20260315120000000
+modified: 20260315120000000
+rdt.order: 5
+rdt.plugin-key: ext-connect
+rdt.plugin-name: ext connect
+rdt.plugin-subtitle: CLI-first inbound path for external tools — context resolution, templates, and outbound text-commands
+rdt.section: FAQ
+title: $:/plugins/rimir/ext-connect/doc/faq
+type: text/vnd.tiddlywiki
+
+<$transclude $tiddler="$:/plugins/rimir/doc-template/templates/page">
+<$fill $name="body">
+
+!! Q: The CLI import hangs and never exits. What's wrong?
+
+Set `TIDDLYWIKI_CLI_MODE=1` before the command. Without this, the filesystem-watcher plugin starts chokidar and keeps the Node.js process alive. The environment variable tells filesystem-watcher to skip startup so the process exits after import.
+
+!! Q: My template filter returns nothing — the output field is empty. Why?
+
+Template field values are TiddlyWiki filter expressions, not literal strings. If you want a literal value, wrap it in double brackets: `[[my literal value]]`. Without brackets, TW interprets the text as a filter operator, which likely returns no results.
+
+!! Q: Can I use ext-connect without the filesystem-watcher plugin?
+
+Yes, but with limitations. The CLI import path writes `.tid` files directly to disk and does not require filesystem-watcher. However, if you have a running server, the new files will not appear in the browser until you reload — filesystem-watcher is what detects new files and syncs them to the browser automatically.
+
+</$fill>
+</$transclude>
