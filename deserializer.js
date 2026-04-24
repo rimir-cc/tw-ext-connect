@@ -13,7 +13,6 @@ Returns [] because we handle everything internally.
 "use strict";
 
 var resolve = require("$:/plugins/rimir/ext-connect/resolve.js");
-var path = require("path");
 
 /**
  * Resolve the tiddlers directory to write into.
@@ -30,6 +29,7 @@ function getTiddlersDirectory() {
 		var entry = includes[0];
 		var includePath = typeof entry === "string" ? entry : entry.path;
 		if(includePath) {
+			var path = require("path");
 			var resolvedWiki = path.resolve($tw.boot.wikiPath, includePath);
 			return path.resolve(resolvedWiki, "tiddlers");
 		}
