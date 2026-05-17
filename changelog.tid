@@ -6,6 +6,7 @@ type: text/vnd.tiddlywiki
 ! Changelog
 
 |!Version |!Date |!Changes |
+|v0.1.9 |2026-05-17 |Test coverage push: 5 new HTTP-level specs for `POST /api/ext-connect/put-tiddler` — CSRF rejection without `X-Requested-With`; invalid JSON body → 400; missing required `text` field → 400; valid body saves the tiddler and returns title; response sets Content-Type `application/json` and open CORS. Uses the new `$:/test-helpers/http-server` harness in tw-tests umbrella. Plugin coverage 52.5% → 53.8% lines (rises further once paired-tests for `resolve.js` action paths land in a follow-up). |
 |v0.1.8 |2026-04-27 |Declare hard dependent `theme` and `doc-template` as soft-dependent in plugin.info |
 |v0.1.7 |2026-04-07 |Expand test coverage: 43→111 specs (evaluateTemplate, filesystem-paths-setup, deserializer, route, text-command integration) |
 |v0.1.6 |2026-03-15 |Add null guard to th-saving-tiddler hook |
